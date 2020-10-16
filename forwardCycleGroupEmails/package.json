@@ -1,0 +1,22 @@
+{
+  "name": "forwardCycleGroupEmails",
+  "version": "1.0.0",
+  "description": "Initialise Node: ``` npm init --yes ```",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc --build tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.64",
+    "@types/node": "^14.11.8",
+    "tsc-watch": "^4.2.9",
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.772.0"
+  }
+}
