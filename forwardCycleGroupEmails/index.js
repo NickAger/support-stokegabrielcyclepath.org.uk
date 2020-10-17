@@ -37,19 +37,14 @@ exports.handler = async (event, context) => {
     const messageId = record.ses.mail.messageId;
     const sender = record.ses.mail.source;
     var message = await readMessageFromS3(messageId);
-    message = message.replace(/^DKIM-Signature/im, "X-Original-DKIM-Signature");
-    message = message.replace(/^From/im, "X-Original-From");
-    message = message.replace(/^Source/im, "X-Original-Source");
-    message = message.replace(/^Sender/im, "X-Original-Sender");
-    message = message.replace(/^Return-Path/im, "X-Original-Return-Path");
-    message = message.replace(/^Domainkey-Signature/im, "X-Original-Domainkey-Signature");
-    await sendMessage(message, sender);
+    const reformattedMessage = prepareMessageForForwarding(message, sender);
+    await sendMessage(reformattedMessage);
     return;
 };
 async function readMessageFromS3(messageId) {
     const emailS3KeyPath = `info/${messageId}`;
     const bucketName = 'email-stokegabrielcyclepath-org-uk';
-    console.log(`About to read from bucket: ${bucketName}, path: ${emailS3KeyPath}`);
+    debugLog(`About to read from bucket: ${bucketName}, path: ${emailS3KeyPath}`);
     const s3Client = new aws.S3();
     const getObjectOutput = await s3Client.getObject({ Bucket: bucketName, Key: emailS3KeyPath }).promise();
     if (!getObjectOutput.Body) {
@@ -58,12 +53,27 @@ async function readMessageFromS3(messageId) {
     const emailBody = getObjectOutput.Body.toString('utf8');
     return emailBody;
 }
-async function sendMessage(message, sender) {
+function prepareMessageForForwarding(message, sender) {
+    message = message.replace(/^DKIM-Signature/im, "X-Original-DKIM-Signature");
+    message = message.replace(/^From/im, "X-Original-From");
+    message = message.replace(/^Source/im, "X-Original-Source");
+    message = message.replace(/^Sender/im, "X-Original-Sender");
+    message = message.replace(/^Return-Path/im, "X-Original-Return-Path");
+    message = message.replace(/^Domainkey-Signature/im, "X-Original-Domainkey-Signature");
+    message = `From: ${sender} forwarded from <info@stokegabrielcyclepath.org.uk>\r\nReply-To: ${sender}\r\n` + message;
+    return message;
+}
+async function sendMessage(message) {
     const params = {
         RawMessage: { Data: message },
         Destinations: ["nick.ager@gmail.com"],
-        Source: sender
+        Source: "info@stokegabrielcyclepath.org.uk"
     };
-    console.log(`About to send message using SES, sender: '${sender}', message: ${message}`);
+    debugLog(`About to send message using SES, message: ${message}`);
     return new aws.SES().sendRawEmail(params).promise();
+}
+function debugLog(...data) {
+    if (process.env.DEBUGGING_ENABLED === "ENABLED") {
+        console.log(data);
+    }
 }
