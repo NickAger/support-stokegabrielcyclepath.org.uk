@@ -11,10 +11,42 @@ https://github.com/sirceljm/AWS-SES-simple-mail-forward
 https://aws.amazon.com/blogs/messaging-and-targeting/forward-incoming-email-to-an-external-destination/
 */
 
+
+export const handler = async (event: SESEvent, context: Context): Promise<void> => {
+    if (event.Records.length === 0) {
+        return Promise.reject(new Error(`Error: Received invalid SES message with no Records: '${JSON.stringify(event)}'`))
+    }
+    const record = event.Records[0]
+    const headers = record.ses.mail.headers
+    const spamVerdict = headers.find(header=>header.name == "X-SES-Spam-Verdict")
+    const virusVerdict = headers.find(header=>header.name == "X-SES-Virus-Verdict")
+
+    if (record.eventSource !== "aws:ses" ||
+        spamVerdict === undefined || spamVerdict.value !== 'PASS' || 
+        virusVerdict == undefined || virusVerdict.value !== 'PASS') {
+        return Promise.reject(new Error(`Error: Received invalid SES message with no Records: '${JSON.stringify(event)}', spamVerdict = ${spamVerdict === undefined ? 'undefined' : spamVerdict.value}, virusVerdict = ${virusVerdict === undefined ? 'undefined' : virusVerdict.value}`))
+    }
+
+    const messageId = record.ses.mail.messageId
+    const sender = record.ses.mail.source
+
+    var message = await readMessageFromS3(messageId)
+    message = message.replace(/^DKIM-Signature/im, "X-Original-DKIM-Signature")
+    message = message.replace(/^From/im, "X-Original-From");
+    message = message.replace(/^Source/im, "X-Original-Source");
+    message = message.replace(/^Sender/im, "X-Original-Sender");
+    message = message.replace(/^Return-Path/im, "X-Original-Return-Path");
+    message = message.replace(/^Domainkey-Signature/im, "X-Original-Domainkey-Signature");
+
+    await sendMessage(message, sender)
+    return
+}
+
 async function readMessageFromS3(messageId: String): Promise<String> {
-    const emailS3KeyPath = `/info/{messageId}`
+    const emailS3KeyPath = `info/${messageId}`
     const bucketName = 'email-stokegabrielcyclepath-org-uk'
 
+    console.log(`About to read from bucket: ${bucketName}, path: ${emailS3KeyPath}`)
     const s3Client = new aws.S3()
     const getObjectOutput = await s3Client.getObject({Bucket: bucketName, Key: emailS3KeyPath}).promise()
     if (!getObjectOutput.Body) {
@@ -30,32 +62,7 @@ async function sendMessage(message: String, sender: string) : Promise<aws.SES.Se
         Destinations: [ "nick.ager@gmail.com" ],
         Source: sender
     }
+
+    console.log(`About to send message using SES, sender: '${sender}', message: ${message}`)
     return new aws.SES().sendRawEmail(params).promise()
-}
-
-export const handler = async (event: SESEvent, context: Context): Promise<void> => {
-    const headers = event.Records[0].ses.mail.headers
-    const spamVerdict = headers.find(header=>header.name == "X-SES-Spam-Verdict")
-    const virusVerdict = headers.find(header=>header.name == "X-SES-Virus-Verdict")
-
-    if (event.Records.length == 0 || event.Records[0].eventSource !== "aws:ses" ||
-        spamVerdict === undefined || spamVerdict.value !== 'PASS' || 
-        virusVerdict == undefined || virusVerdict.value !== 'PASS') {
-        return Promise.reject(new Error(`Error: Received invalid SES message: '${JSON.stringify(event)}', spamVerdict = ${spamVerdict === undefined ? 'undefined' : spamVerdict.value}, virusVerdict = ${virusVerdict === undefined ? 'undefined' : virusVerdict.value}`))
-    }
-    const record = event.Records[0]
-    const messageId = record.ses.mail.messageId
-    const sender = record.ses.mail.source
-    // const subject = record.ses.mail.commonHeaders.subject
-
-    var message = await readMessageFromS3(messageId)
-    message = message.replace(/^DKIM-Signature/im, "X-Original-DKIM-Signature")
-    message = message.replace(/^From/im, "X-Original-From");
-    message = message.replace(/^Source/im, "X-Original-Source");
-    message = message.replace(/^Sender/im, "X-Original-Sender");
-    message = message.replace(/^Return-Path/im, "X-Original-Return-Path");
-    message = message.replace(/^Domainkey-Signature/im, "X-Original-Domainkey-Signature");
-
-    await sendMessage(message, sender)
-    return
 }

@@ -24,3 +24,12 @@ $ npm install --save-dev @types/aws-lambda
  ```
  tsc --watch
  ```
+
+ Build:
+ ```
+npm run-script build
+ ```
+ or:
+ ```
+tsc --build tsconfig.json
+ ```
