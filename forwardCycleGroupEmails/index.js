@@ -66,7 +66,7 @@ function prepareMessageForForwarding(message, sender) {
 async function sendMessage(message) {
     const params = {
         RawMessage: { Data: message },
-        Destinations: ["nick.ager@gmail.com"],
+        Destinations: ["nick.ager@gmail.com", "martin.oldridge@gmail.com"],
         Source: "info@stokegabrielcyclepath.org.uk"
     };
     debugLog(`About to send message using SES, message: ${message}`);

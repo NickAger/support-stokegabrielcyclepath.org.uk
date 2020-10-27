@@ -65,7 +65,7 @@ function prepareMessageForForwarding(message: String, sender: String) : String {
 async function sendMessage(message: String) : Promise<aws.SES.SendEmailResponse> {
     const params : aws.SES.SendRawEmailRequest = {
         RawMessage: { Data: message },
-        Destinations: [ "nick.ager@gmail.com" ],
+        Destinations: [ "nick.ager@gmail.com", "martin.oldridge@gmail.com" ],
         Source: "info@stokegabrielcyclepath.org.uk"
     }
 
